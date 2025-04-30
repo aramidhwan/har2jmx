@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Login Page</title>
+
+    <!--jquery script-->
+<!--    <script src="/js/jquery-3.7.1.js"></script>-->
+    <!--bootstrap 용 css, js-->
+    <link rel="stylesheet" href="/css/bootstrap.min.css">
+    <script src="/js/index.js"></script>
+<!--    <script src="/common-service/js/bootstrap.bundle.min.js"></script>-->
+
+    <link rel="stylesheet" href="/css/common.css">
+    <style>
+    .cssAlignLeft {
+        text-align: left;
+        vertical-align: middle;
+    }
+    .nowrap {
+      white-space: nowrap;
+    }
+
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- Sign In -->
+    <div class="container__form">
+        <form id="uploadForm" name="uploadForm" class="form" action="/uploadHarFile" method="post" enctype="multipart/form-data">
+            <h2 class="form__title">HAR 2 JMX Converter</h2>
+                <div id="tableContainer">
+                    <table class="table table-bordered">
+                        <tbody>
+                        <tr>
+                            <td class="cssAlignLeft nowrap">프로젝트명</td>
+                            <td class="cssAlignLeft nowrap">
+                                <input type="text" id="prjNm" name="prjNm" value="NPMS" size="12" required>
+                                <input type="text" id="serverIp" name="serverIp" value="https://npims-stg.skcc.com" size="30" required>
+<!--                                <input type="text" id="prjNm" name="prjNm" value="MyPizza" size="12" required>-->
+<!--                                <input type="text" id="serverIp" name="serverIp" value="https://my-pizza.io" size="30" required>-->
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="cssAlignLeft nowrap">HAR 파일 선택</td>
+                            <td class="cssAlignLeft nowrap">
+                                <input type="file" id="harFile" name="harFile" required>
+                            </td>
+                        </tr>
+<!--                        <tr>-->
+<!--                            <td class="cssAlignLeft nowrap">공통 Server Name or IP</td>-->
+<!--                            <td class="cssAlignLeft nowrap">-->
+<!--&lt;!&ndash;                                <input type="text" id="serverIp" name="serverIp" value="https://npims-stg.skcc.com" size="40" required>&ndash;&gt;-->
+<!--                                <input type="text" id="serverIp" name="serverIp" value="https://my-pizza.io" size="40" required>-->
+<!--                            </td>-->
+<!--                        </tr>-->
+                        <tr>
+                            <td class="cssAlignLeft nowrap">HTTPSampler 제외 확장자</td>
+                            <td class="cssAlignLeft nowrap">
+                                <input type="text" id="excludePostfix" name="excludePostfix" value=".js,.css,.png,.jpg,.gif,.ico,.woff2" size="40" required>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="cssAlignLeft nowrap">Seq No & 화면명</td>
+                            <td class="cssAlignLeft nowrap">
+                                <input type="text" id="DTCNo" name="DTCNo" value="1" size="1">
+                                <input type="text" id="DTCName" name="DTCName" value="메인페이지">
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="cssAlignLeft nowrap">JWT Token Key Name</td>
+                            <td class="cssAlignLeft nowrap">
+                                <input type="text" id="jwtTokenNm" name="jwtTokenKeyNm" value="accessToken" size="40">
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="cssAlignLeft nowrap">JSON 응답 검증 코드</td>
+                            <td class="cssAlignLeft nowrap">
+                                <input type="text" id="assertionCode" name="assertionCode" value="code==200" size="40">
+<!--                                <input type="text" id="assertionCode" name="assertionCode" value="BIZ_SUCCESS==0" size="40">-->
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="cssAlignLeft nowrap">응답 검증 제외 URL(exact)</td>
+                            <td class="cssAlignLeft nowrap">
+                                <input type="text" id="excludePaths" name="excludePaths" value="/ko, /ko-1, /ko-2" size="40">
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="cssAlignLeft nowrap">응답 검증 제외 URL(contain)</td>
+                            <td class="cssAlignLeft nowrap">
+                                <input type="text" id="excludeContainPaths" name="excludeContainPaths" value="/js/, /css/, /images/, /image/, /img/, /ko" size="40">
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="cssAlignLeft nowrap">생성 JMX File</td>
+                            <td class="cssAlignLeft nowrap">
+                                <input type="text" id="jmxFileNm" name="jmxFileNm" value="" size="62" required>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+<!--            <input id="emailSignIn" type="email" placeholder="Email" class="input" value="aramidkim@naver.com" autocomplete="username"/>-->
+<!--            <input id="passwordSignIn" type="password" placeholder="Password" class="input" value="shin22" autocomplete="current-password"/>-->
+<!--            <input id="redirectUrl" type="hidden" th:value="${redirectUrl}"/>-->
+<!--            <a href="#" class="link">Forgot your password?</a>-->
+            <button type="submit" class="btn">Convert</button>
+        </form>
+    </div>
+
+</div>
+</body>
+</html>

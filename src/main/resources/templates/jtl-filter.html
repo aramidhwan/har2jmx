@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Login Page</title>
+
+    <!--jquery script-->
+<!--    <script src="/js/jquery-3.7.1.js"></script>-->
+    <!--bootstrap 용 css, js-->
+    <link rel="stylesheet" href="/css/bootstrap.min.css">
+    <script src="/js/index.js"></script>
+<!--    <script src="/common-service/js/bootstrap.bundle.min.js"></script>-->
+
+    <link rel="stylesheet" href="/css/common.css">
+    <style>
+    .cssAlignLeft {
+        text-align: left;
+        vertical-align: middle;
+    }
+    .nowrap {
+      white-space: nowrap;
+    }
+
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- Sign In -->
+    <div class="container__form">
+        <form id="uploadForm" name="uploadForm" class="form" action="/uploadJtlFile" method="post" enctype="multipart/form-data">
+            <h2 class="form__title">이거 안쓰고 "D:\apache-jmeter-5.6.3\JMETER 원격실행 스크립트\JtlFilter.java" 로 대체됨</h2>
+                <div id="tableContainer">
+                    <table class="table table-bordered">
+                        <tbody>
+                        <tr>
+                            <td class="cssAlignLeft nowrap">프로젝트명</td>
+                            <td class="cssAlignLeft nowrap">
+                                <input type="text" id="prjNm" name="prjNm" value="MyPizza" required>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="cssAlignLeft nowrap">JTL 파일 선택</td>
+                            <td class="cssAlignLeft nowrap">
+                                <input type="file" id="jtlFile" name="jtlFile" required>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="cssAlignLeft nowrap">필터링 문자</td>
+                            <td class="cssAlignLeft nowrap">
+                                <input type="text" id="filterStr" name="filterStr" value="■" size="20" required>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="cssAlignLeft nowrap">필터된 JTL File 생성 DIR</td>
+                            <td class="cssAlignLeft nowrap">
+                                <input type="text" id="jtlDir" name="jtlDir" value="D:\apache-jmeter-5.6.3\bin\scripts\RESULT" size="60" required>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+<!--            <input id="emailSignIn" type="email" placeholder="Email" class="input" value="aramidkim@naver.com" autocomplete="username"/>-->
+<!--            <input id="passwordSignIn" type="password" placeholder="Password" class="input" value="shin22" autocomplete="current-password"/>-->
+<!--            <input id="redirectUrl" type="hidden" th:value="${redirectUrl}"/>-->
+<!--            <a href="#" class="link">Forgot your password?</a>-->
+            <button type="submit" class="btn">Convert</button>
+        </form>
+    </div>
+
+</div>
+</body>
+</html>

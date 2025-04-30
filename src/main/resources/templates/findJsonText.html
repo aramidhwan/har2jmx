@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!--bootstrap 용 css-->
+    <link rel="stylesheet" href="/css/bootstrap.min.css">
+    <!--bootstrap 용 js-->
+    <script src="/js/bootstrap.bundle.min.js"></script>
+    <script src="/js/findJsonText.js"></script>
+    <script src="/js/common-util.js"></script>
+    <style>
+        table th {
+            white-space: nowrap;
+            overflow: hidden;   // 만약 셀 크기가 너무 작아 글자가 잘린다면, overflow: hidden; 또는 text-overflow: ellipsis; 속성을 활용하면 좋습니다.
+            text-overflow: ellipsis;
+        }
+        table td {
+            white-space: nowrap;
+            overflow: hidden;   // 만약 셀 크기가 너무 작아 글자가 잘린다면, overflow: hidden; 또는 text-overflow: ellipsis; 속성을 활용하면 좋습니다.
+            text-overflow: ellipsis;
+        }
+        .cssAlignCenter {
+            text-align: center;
+            vertical-align: middle;
+        }
+        div.colcss1 {
+            padding-bottom: 3px;
+            display: flex;
+            justify-content: right;
+        }
+        .title {
+            font-weight: bold;
+            color: blue;
+            white-space:nowrap;
+        }
+        .copyPath, .copyJson {
+            cursor: pointer;
+            color: blue;
+            text-decoration: none;
+        }
+        mark {
+/*            background-color: #ffc107; /* orange 노랑 배경, 따뜻한 느낌 */
+            background-color: #ff5722; /* 강렬한 오렌지 배경 */
+/*            background-color: #00e676; /* 초록 배경 눈에 띄는 하이라이트 */
+/*            background-color: #e53935; /* 빨간 배경, 경고 느낌 */
+/*            background-color: #2196f3; /* 파랑 배경, 시원한 강조 */
+            color: white;
+            font-weight: bold;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        #convertJMXResultModal .modal-dialog {
+            max-width: none; /* Bootstrap 기본 제한 해제 */
+            width: auto;     /* 기본값을 auto로 설정 */
+            display: inline-block;
+        }
+        #convertJMXResultModal .modal-content {
+            background-color: #fff; /* Bootstrap 기본 배경색 명시 */
+        }
+    </style>
+</head>
+<body>
+<br><br>
+<div class="container-sm">
+
+    <div class="row">
+        <div class="col">
+            <h4 style="white-space:nowrap;">Project Name</h4>
+        </div>
+        <div class="col colcss1">
+            <h4 th:if="${prjNm}" id="prjNm" class="title">[[${prjNm}]]</h4>
+        </div>
+        <div class="col">
+            <h4 style="white-space:nowrap;">Server Name</h4>
+        </div>
+        <div class="col colcss1">
+            <h4 th:if="${serverIp}" th:text="${serverIp}" class="title">[[${serverIp}]]</h4>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col">
+            <h4 style="white-space:nowrap;">DTC No & Name</h4>
+        </div>
+        <div class="col colcss1">
+            <h4 id="tcNm" th:if="${DTCName}" th:text="${(DTCNo != null ? DTCNo + ' ' : '') + DTCName}" class="title"></h4>
+        </div>
+        <div class="col">
+            <h4 style="white-space:nowrap;">JWT Token Name</h4>
+        </div>
+        <div class="col colcss1">
+            <h4 th:if="${jwtTokenNm}" th:text="${jwtTokenNm}" class="title">[[${jwtTokenNm}]]</h4>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col" spane="2">
+            <h4 style="white-space:nowrap;">JSON 응답 검증 코드</h4>
+        </div>
+        <div class="col colcss1" spane="2">
+            <h4 th:if="${assertionCode}" th:text="${assertionCode}" class="title">[[${assertionCode}]]</h4>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col" spane="2">
+            <h4 style="white-space:nowrap;">JMX 파일 (<a data-bs-toggle="modal" data-bs-target="#httpSamplerListModal" data-bs-storeId="" href="javascript:void(0);" class="title">HTTP Sampler List</a>)</h4>
+        </div>
+        <div class="col colcss1" spane="2">
+            <h4 th:if="${jmxFileWithPath}" class="title">
+                <a id="jmxFileWithPath" th:data-value="${jmxFileWithPath}" href="#" onclick="launchJMeter()">[[${jmxFileNm}]]</a>
+            </h4>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col">   <!--  style="overflow-y: scroll;" -->
+            <form id="findJsonForm" name="findJsonForm" method="post">
+                <label for="keyword">Response JSON 데이터에서 찾을 keyword : </label>
+                <input type="text" id="keyword" name="keyword" value="384">
+                <button id="btnFind" type="button" onclick="fnLoadFindData()">FIND</button>
+                <button id="btnConvertKeyword" type="button" onclick="fnConvertJMX()">Keyword를 변수로 대체</button>
+<!--                <button id="btnAddTestFragment" type="button" onclick="fnAddTestFragment()">TestFragment</button>-->
+                <button id="btnClearAllFindTables" type="button" onclick="fnClearAllFindTables()">화면-CLEAR</button>
+                <button id="btnClearAllDB" type="button" onclick="fnClearAllDB()">DB-삭제</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col">
+            <hr>
+        </div>
+    </div>
+
+    <div class="row">
+        <div id="tableContainer" class="col">
+        </div>
+    </div>
+</div>      <!-- div class="container-sm" -->
+
+<div class="modal fade" id="httpSamplerListModal" tabindex="-1" aria-labelledby="httpSamplerListModalLabel" aria-hidden="true" style="display: none;">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="httpSamplerListModalLabel">HTTP(S) Sampler LIst - [[${DTCName}]]</h1>
+            </div>
+
+            <div class="modal-body">
+                <table class="table table-striped table-bordered">
+                    <thead>
+                    <tr class="table-warning">
+                        <th>Sampler Path</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="responseJsonDto : ${responseJsonDtoList}">
+                        <td class="path-cell" th:text="${responseJsonDto.path}">Sample Path</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <!--                <button type="button" class="btn btn-secondary" id="registCancel" data-bs-dismiss="modal">닫기</button>-->
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="convertJMXResultModal" tabindex="-1" aria-labelledby="convertJMXResultModalLabel" aria-hidden="true" style="display: none;">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="convertJMXResultModalLabel">Convert JMX 결과</h1>
+            </div>
+
+            <div class="modal-body">
+                <table id="tblConvertJMXResult" class="table table-striped table-bordered">
+                    <thead>
+                    <tr class="table-warning">
+                        <th>변경 내용</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <!--                <button type="button" class="btn btn-secondary" id="registCancel" data-bs-dismiss="modal">닫기</button>-->
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
