@@ -7,6 +7,8 @@ import com.shshin.har2jmx.dto.ResponseJsonDto;
 import com.shshin.har2jmx.service.HarService;
 import com.shshin.har2jmx.service.JmxService;
 import com.shshin.har2jmx.service.TestFragmentService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -29,6 +31,7 @@ import java.util.Map;
 @Controller
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Har2Jmx", description = "HAR to JMX Converter")
 public class Har2JmxController {
     private final HarService harService;
     private final JmxService jmxService ;
@@ -45,6 +48,7 @@ public class Har2JmxController {
     }
 
 
+    @Operation(summary = "JTL 업로드", description = "JTL 업로드하여 필터링 처리")
     @PostMapping("/uploadJtlFile")
     public String uploadJtlFile(@ModelAttribute JtlUploadDto jtlUploadDto,
                                   Model model) throws IOException {
@@ -54,6 +58,9 @@ public class Har2JmxController {
 
         return "" ;
     }
+
+    @Operation(summary = "HAR 파일 업로드", description = "HAR 파일을 업로드하여 JMX 파일 생성")
+    
     @PostMapping("/uploadHarFile")
     public String uploadHarFile(@ModelAttribute HarUploadDto harUploadDto, Model model) {
         try {
@@ -94,6 +101,7 @@ public class Har2JmxController {
         }
     }
 
+    @Operation(summary = "keyword 찾기", description = "Response JSON 데이터에서 특정 keyword 찾기")
     @PostMapping("/api/findJsonData")
     public ResponseEntity<ResponseDto> findJsonData(@RequestBody Map<String, String> body) {
         String keyword = body.get("keyword");
@@ -109,6 +117,7 @@ public class Har2JmxController {
         return ResponseEntity.ok(responseDto) ;
     }
 
+    @Operation(summary = "keyword를 변수로 대체", description = "JMX 파일 내용에서 특정 keyword를 찾아 변수명으로 대체")
     @PostMapping("/api/convertJMX")
     // JMX 파일 내용의 keyword를 변수로 대체하기
     public ResponseEntity<ResponseDto> convertJMX(@RequestBody Map<String, String> body) {
@@ -149,8 +158,9 @@ public class Har2JmxController {
         }
     }
 
+    @Operation(summary = "keyword 추출 JSON Extractor 추가", description = "JMX HTTP Request에 특정 keyword 추출용 JSON Extractor 추가")
     @PostMapping("/api/addJsonExtractor")
-    // JMX 파일 내용의 keyword를 변수로 대체하기
+    // JMX HTTP Request에 특정 keyword 추출용 JSON Extractor 추가
     public ResponseEntity<ResponseDto> addJsonExtractor(@RequestBody Map<String, String> body) {
         String prjNm = body.get("prjNm");
         String tcNm = body.get("tcNm");
@@ -213,6 +223,7 @@ public class Har2JmxController {
 //        }
 //    }
 
+    @Operation(summary = "JMeter 실행", description = "생성된 JMX link 클릭 시 JMeter 자동 실행")
     @PostMapping("/api/runJmeter")
     public ResponseEntity<ResponseDto> runJMeter(@RequestBody JMeterRequest request) {
         String jmxPath = request.getPath();
