@@ -59,6 +59,7 @@ public class JmxService {
     }
 
     // [FIND] keyword를 변수로 대체
+    @Transactional
     public List<String> convertJMX(String jmxFileNm, String prjNm, String tcNm, String keywordKeyNm, String keyword) throws RuntimeException {
         // 작업내용 메시지
         List<String> returnMsg = new ArrayList<>() ;
@@ -128,6 +129,12 @@ public class JmxService {
                         if (matcher4HTTPSamplerPath.find()) {
                             String newPath = matcher4HTTPSamplerPath.replaceAll(Matcher.quoteReplacement("${" + keywordKeyNm + "}"));
                             stringProp.setTextContent(newPath);
+
+                            List<ResponseJson> responseJsonList = responseJsonRepository.findByPrjNmAndTcNmAndPath(prjNm, tcNm, currentPath) ;
+                            for (ResponseJson responseJson : responseJsonList) {
+                                responseJson.setPath(newPath);
+                                responseJsonRepository.save(responseJson) ;
+                            }
                             returnMsg.add("✅ HTTPSampler.path 변경됨: " + currentPath + " → " + newPath);
                         }
 
@@ -213,14 +220,14 @@ public class JmxService {
 
             // DB에서 Path와 Response JSON Data를 얻어온다.
             List<ResponseJson> responseJsonList = responseJsonRepository.findByPrjNmAndTcNmAndPath(prjNm, tcNm, targetPath4JsonExtractor);
-            String responseJsonString = responseJsonList.get(0).getText();
+            String responseJsonString = responseJsonList.get(0).getText();  // Response JSON Data
             String keywordJsonPath = JsonUtil.findJsonPathsByKeyOrValue(responseJsonString, keyword, "VALUE").split("\n")[0];
             String keywordKeyNm = keywordJsonPath.substring(keywordJsonPath.lastIndexOf(".") + 1);
-            System.out.println("### prjNm : " + prjNm);
-            System.out.println("### TC Name : " + tcNm);
-            System.out.println("### keyword : " + keyword);
-            System.out.println("### keywordJsonPath : " + keywordJsonPath);
-            System.out.println("### targetPath4JsonExtractor : " + targetPath4JsonExtractor);
+//            System.out.println("### prjNm : " + prjNm);
+//            System.out.println("### TC Name : " + tcNm);
+//            System.out.println("### keyword : " + keyword);
+//            System.out.println("### keywordJsonPath : " + keywordJsonPath);
+//            System.out.println("### targetPath4JsonExtractor : " + targetPath4JsonExtractor);
 
             // JMX XML 문서 파싱
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -289,5 +296,12 @@ public class JmxService {
         }
 
         return returnMsg ;
+    }
+
+    public List<ResponseJsonDto> getDBSamplerList(String prjNm, String tcNm) {
+        return responseJsonRepository.findByPrjNmAndTcNm(prjNm, tcNm)
+                .stream()
+                .map(ResponseJsonDto::of)
+                .toList();
     }
 }

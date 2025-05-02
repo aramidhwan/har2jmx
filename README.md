@@ -3,10 +3,10 @@
 # 서비스 제공 기능
 1. 웹 브라우저의 개발자 도구(F12)에서 화면을 Record하여 저장한 .har 파일을 자동으로 JMeter 파일(jmx)로 변환해 준다..
 2. JWT Token Key Name을 입력하면 자동으로 로그인 url에서 JWT 값을 저장한다.
-3. JWT가 존재할 경우 이후 모든 url header에 Authorization : Bearer + jwtToken 을 추가해 준다.
-4. JSON 응답의 검증을 자동으로 수행한다. (http_code == 200 등)
+3. JWT가 존재할 경우 이후 모든 JMeter HTTP Request의 Header Manager에 Authorization : Bearer + jwtToken 을 추가해 준다.
+4. JSON 응답의 검증(성공/실패)을 자동으로 수행한다. (http_code == 200 등)
 5. 특정 keyword를 찾아 JSON Extractor를 추가하고 변수로 대체해 준다. (ex : 384 -> ${projectUid})
-6. "로그인" url은 Once Only Controller & TestFragment로 처리하여 효율을 극대화 한다.
+6. "로그인" url은 Once Only Controller & TestFragment로 처리하여 시나리오 마다의 중복구현을 회피한다.
 <br>
 
 # 메인 화면

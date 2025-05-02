@@ -42,7 +42,7 @@ public class HarService {
     @Value("${harParsor.queryString.type:PARAMETER-TYPE}")
     private String QUERY_STRING_TYPE ;
 
-    // 업로드된 Har 파일에 "로그인 액션"이 없더라도 이전 Har의 "로그인 액션" 재활용
+    // 업로드된 Har 파일에 "로그인 액션"이 없더라도 이전 Har의 "로그인 액션" 재활용 차 전역 변수화해야 한다.
     private HTTPSamplerDto loginActionSampler ;
     boolean needAuthorization ;
 
@@ -53,9 +53,6 @@ public class HarService {
     public List<ResponseJsonDto> makeJmxFile(HarUploadDto harUploadDto) throws Exception {
         // 화면(HTTP Sampler List Modal)에 보내 줄 DTO (리턴 객체)
         List<ResponseJsonDto> responseJsonDtoList = new ArrayList<>() ;
-        
-        // HttpSampler에서 제외할 url
-        List<String> EXCLUDE_POSTFIX = Arrays.asList(harUploadDto.getExcludePostfix().split(","));
 
         // 동일 PRJ_NM의 TC_NM의 기존 DB 데이터 삭제 ( PRJ_NM 과 TC_NM 이 기존에 있으면 삭제 )
         responseJsonRepository.deleteByPrjNmAndTcNm(harUploadDto.getPrjNm(), harUploadDto.getDTCName());
@@ -67,53 +64,7 @@ public class HarService {
         JSONArray txList = getTransactionList(harFileJsonContent);
 
         // Sampler마다 반복 호출 > HTTPSamplerDto 리스트 만들기
-        List<HTTPSamplerDto> httpSamplerDtoList = new ArrayList<>() ;
-        // Sampler마다 반복 호출 > HTTPSamplerDto 리스트 만들기
-        for (int inx = 0; inx < txList.length(); inx++) {
-            JSONObject response = txList.getJSONObject(inx).getJSONObject("response");
-            // HTTPSamplerDto 만들기
-            HTTPSamplerDto httpSamplerDto = makeHttpSamplerDto(harUploadDto, txList.getJSONObject(inx)) ;
-
-            // "Sampler 만들기"에서 제외할 확장자는 건너띄기(continue) (.js .css .gif 등)
-            if (EXCLUDE_POSTFIX.stream().anyMatch(CommonUtil.cutAfterQuestion(httpSamplerDto.getPath())::endsWith)) {
-                continue;
-            }
-
-            // 콘솔 출력
-            System.out.println("\n### path : [" + httpSamplerDto.getMethod() + "] " + httpSamplerDto.getPath());
-            for (int iny = 0; iny < httpSamplerDto.getQueryArray().length(); iny++) {
-                System.out.println("###        Param[" + iny + "] : " + httpSamplerDto.getQueryArray().getJSONObject(iny).getString("name") + " = " + httpSamplerDto.getQueryArray().getJSONObject(iny).getString("value"));
-            }
-
-            // HTTPSamplerDto 리스트에 추가
-            httpSamplerDtoList.add(httpSamplerDto) ;
-
-            // 화면(HTTP Sampler List)과 DB에 저장할 DTO
-            ResponseJsonDto responseJsonDto = ResponseJsonDto.builder()
-                    .prjNm(harUploadDto.getPrjNm())
-                    .tcNm(harUploadDto.getDTCName())
-                    .path(CommonUtil.cutAfterQuestion(httpSamplerDto.getPath()))
-                    .httpStatus(response.getInt("status"))
-                    .mimeType(response.getJSONObject("content").getString("mimeType"))
-                    // jsonData는 밑에서 response가 json 응답일때 만 DB 저장
-//                        .text(jsonData)
-                    .build();
-
-            // response가 json 응답일때만 H2 DB에 json 응답을 저장
-            if ("application/json".equals(response.getJSONObject("content").getString("mimeType"))) {
-                String jsonData = null ;
-                try {
-                    jsonData = response.getJSONObject("content").getString("text");
-                } catch (JSONException ex) {
-                    // content > text 가 없을 수도 있네? ex: my-pizza의 /auth/sign-in
-//                    throw new RuntimeException("응답(Response) JSON 데이터가 잘못 되었습니다.\nPATH : " + CommonUtil.cutAfterQuestion(httpSamplerDto.getPath()) + "\nJSON DATA : " + jsonData) ;
-                }
-                responseJsonDto.setText(jsonData) ;
-                responseJsonRepository.save(responseJsonDto.toEntity());
-            }
-
-            responseJsonDtoList.add(responseJsonDto) ;
-        }
+        List<HTTPSamplerDto> httpSamplerDtoList = makeHttpSamplerDtoList(harUploadDto, responseJsonDtoList);
 
         DocumentBuilderFactory docFactory = DocumentBuilderFactory.newInstance();
         DocumentBuilder docBuilder = docFactory.newDocumentBuilder();
@@ -198,7 +149,12 @@ public class HarService {
         testPlanHashTree.appendChild(responseTimeGraph);
         testPlanHashTree.appendChild(doc.createElement("hashTree"));
 
-        // -------- [View Result Tree] 결과 확인 ------
+        // ------------------ [결과 테이블] 대시보드 (표) ----------------
+        Element statisticsTable = createStatisticsTable(doc, harUploadDto) ;
+        testPlanHashTree.appendChild(statisticsTable);
+        testPlanHashTree.appendChild(doc.createElement("hashTree"));
+
+        // -------- [결과 확인] View Result Tree ------
         Element resultCollector = createResultCollector(doc);
         testPlanHashTree.appendChild(resultCollector);
         testPlanHashTree.appendChild(doc.createElement("hashTree"));
@@ -232,10 +188,11 @@ public class HarService {
 
         // -------- [ThreadGroup] > [Transaction Controller] > [HTTPSamplerProxy][HeaderManager][JWT JSON Extractor] 만들기 ------
         for (int inx = 0 ; inx < httpSamplerDtoList.size() ; inx++ ) {
-            // "로그인 액션" Sampler 인 경우.
+            // "로그인 액션" Sampler 인 경우.xxx
             if ( CommonUtil.isLoginAction(httpSamplerDtoList.get(inx)) ) {
                 this.loginActionSampler = httpSamplerDtoList.get(inx) ;
-                this.loginActionSampler.setTestname(this.loginActionSampler.getTestname().replace("$dtcNoIndex$", "00"));
+                // testname : 정규표현식: [DTC숫자-00] 구조에서 "숫자" 부분만 ${tcNo}로 대체
+                this.loginActionSampler.setTestname(this.loginActionSampler.getTestname().replace("$dtcNoIndex$", "00").replaceAll("\\[DTC\\d+(?=-)", "[DTC\\${tcNo}").replace(harUploadDto.getDTCName(),"로그인"));
                 this.loginActionSampler.setJsonExtractorDto(JsonExtractorDto.builder()
                                 .testname("JSON Extractor ("+this.loginActionSampler.getJwtTokenKeyNm()+")")
                                 .referenceName(this.loginActionSampler.getJwtTokenKeyNm())
@@ -291,100 +248,66 @@ public class HarService {
         return responseJsonDtoList ;
     }
 
-    private Element createBackendListener(Document doc, HarUploadDto harUploadDto) {
-        Element backendListener = doc.createElement("BackendListener");
-        backendListener.setAttribute("guiclass", "BackendListenerGui");
-        backendListener.setAttribute("testclass", "BackendListener");
-        backendListener.setAttribute("testname", "InfluxDB 1.8 Listener" );
-        backendListener.setAttribute("enabled", "false");
+    private List<HTTPSamplerDto> makeHttpSamplerDtoList(HarUploadDto harUploadDto, List<ResponseJsonDto> responseJsonDtoList) {
+        List<HTTPSamplerDto> httpSamplerDtoList = new ArrayList<>() ;
 
-        // "GET"/"POST" method용 User Defined Variables
-        Element elementProp = doc.createElement("elementProp");
-        elementProp.setAttribute("name", "arguments");
-        elementProp.setAttribute("elementType", "Arguments");
-        elementProp.setAttribute("guiclass", "ArgumentsPanel");
-        elementProp.setAttribute("testclass", "Arguments");
-        backendListener.appendChild(elementProp) ;
+        // HttpSampler에서 제외할 url
+        List<String> EXCLUDE_POSTFIX = Arrays.asList(harUploadDto.getExcludePostfix().split(","));
 
-        Element collectionProp = doc.createElement("collectionProp");
-        collectionProp.setAttribute("name", "Arguments.arguments");
-        elementProp.appendChild(collectionProp) ;
+        // 업로드된 HAR 파일 내용을 한 줄씩 읽기
+        StringBuilder harFileJsonContent = makeHarFileJsonContent(harUploadDto) ;
 
-        Element influxdbMetricsSender = doc.createElement("elementProp");
-        influxdbMetricsSender.setAttribute("name", "influxdbMetricsSender");
-        influxdbMetricsSender.setAttribute("elementType", "Argument");
-        collectionProp.appendChild(influxdbMetricsSender) ;
-        influxdbMetricsSender.appendChild(XmlUtil.createTextProp(doc, "Argument.name", "influxdbMetricsSender")) ;
-        influxdbMetricsSender.appendChild(XmlUtil.createTextProp(doc, "Argument.value", "org.apache.jmeter.visualizers.backend.influxdb.HttpMetricsSender")) ;
-        influxdbMetricsSender.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "=")) ;
+        // HAR entries [배열] (개별 url)
+        JSONArray txList = getTransactionList(harFileJsonContent);
 
-        Element influxdbUrl = doc.createElement("elementProp");
-        influxdbUrl.setAttribute("name", "influxdbUrl");
-        influxdbUrl.setAttribute("elementType", "Argument");
-        collectionProp.appendChild(influxdbUrl) ;
-        influxdbUrl.appendChild(XmlUtil.createTextProp(doc, "Argument.name", "influxdbUrl")) ;
-        influxdbUrl.appendChild(XmlUtil.createTextProp(doc, "Argument.value", "http://localhost:8086/write?db=jmeter")) ;
-        influxdbUrl.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "=")) ;
+        // Sampler마다 반복 호출 > HTTPSamplerDto 리스트 만들기
+        for (int inx = 0; inx < txList.length(); inx++) {
+            JSONObject response = txList.getJSONObject(inx).getJSONObject("response");
+            // HTTPSamplerDto 만들기
+            HTTPSamplerDto httpSamplerDto = makeHttpSamplerDto(harUploadDto, txList.getJSONObject(inx)) ;
 
-        Element application = doc.createElement("elementProp");
-        application.setAttribute("name", "application");
-        application.setAttribute("elementType", "Argument");
-        collectionProp.appendChild(application) ;
-        application.appendChild(XmlUtil.createTextProp(doc, "Argument.name", "application")) ;
-        application.appendChild(XmlUtil.createTextProp(doc, "Argument.value", harUploadDto.getPrjNm())) ;
-        application.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "=")) ;
+            // "Sampler 만들기"에서 제외할 확장자는 건너띄기(continue) (.js .css .gif 등)
+            if (EXCLUDE_POSTFIX.stream().anyMatch(CommonUtil.cutAfterQuestion(httpSamplerDto.getPath())::endsWith)) {
+                continue;
+            }
 
-        Element measurement = doc.createElement("elementProp");
-        measurement.setAttribute("name", "measurement");
-        measurement.setAttribute("elementType", "Argument");
-        collectionProp.appendChild(measurement) ;
-        measurement.appendChild(XmlUtil.createTextProp(doc, "Argument.name", "measurement")) ;
-        measurement.appendChild(XmlUtil.createTextProp(doc, "Argument.value", "jmeter")) ;
-        measurement.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "=")) ;
+            // 콘솔 출력
+            System.out.println("\n### path : [" + httpSamplerDto.getMethod() + "] " + httpSamplerDto.getPath());
+            for (int iny = 0; iny < httpSamplerDto.getQueryArray().length(); iny++) {
+                System.out.println("###        Param[" + iny + "] : " + httpSamplerDto.getQueryArray().getJSONObject(iny).getString("name") + " = " + httpSamplerDto.getQueryArray().getJSONObject(iny).getString("value"));
+            }
 
-        Element summaryOnly = doc.createElement("elementProp");
-        summaryOnly.setAttribute("name", "summaryOnly");
-        summaryOnly.setAttribute("elementType", "Argument");
-        collectionProp.appendChild(summaryOnly) ;
-        summaryOnly.appendChild(XmlUtil.createTextProp(doc, "Argument.name", "summaryOnly")) ;
-        summaryOnly.appendChild(XmlUtil.createTextProp(doc, "Argument.value", "false")) ;
-        summaryOnly.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "=")) ;
+            // HTTPSamplerDto 리스트에 추가
+            httpSamplerDtoList.add(httpSamplerDto) ;
 
-        Element samplersRegex = doc.createElement("elementProp");
-        samplersRegex.setAttribute("name", "samplersRegex");
-        samplersRegex.setAttribute("elementType", "Argument");
-        collectionProp.appendChild(samplersRegex) ;
-        samplersRegex.appendChild(XmlUtil.createTextProp(doc, "Argument.name", "samplersRegex")) ;
-        samplersRegex.appendChild(XmlUtil.createTextProp(doc, "Argument.value", "^■.*")) ;
-        samplersRegex.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "=")) ;
+            // 화면(HTTP Sampler List)과 DB에 저장할 DTO
+            ResponseJsonDto responseJsonDto = ResponseJsonDto.builder()
+                    .prjNm(harUploadDto.getPrjNm())
+                    .tcNm(harUploadDto.getDTCName())
+                    .path(CommonUtil.cutAfterQuestion(httpSamplerDto.getPath()))
+                    .httpStatus(response.getInt("status"))
+                    .mimeType(response.getJSONObject("content").getString("mimeType"))
+                    // jsonData는 밑에서 response가 json 응답일때 만 DB 저장
+//                        .text(jsonData)
+                    .build();
 
-        Element percentiles = doc.createElement("elementProp");
-        percentiles.setAttribute("name", "percentiles");
-        percentiles.setAttribute("elementType", "Argument");
-        collectionProp.appendChild(percentiles) ;
-        percentiles.appendChild(XmlUtil.createTextProp(doc, "Argument.name", "percentiles")) ;
-        percentiles.appendChild(XmlUtil.createTextProp(doc, "Argument.value", "90;95")) ;
-        percentiles.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "=")) ;
+            // response가 json 응답일때만 H2 DB에 json 응답을 저장
+            if ("application/json".equals(response.getJSONObject("content").getString("mimeType"))) {
+                String jsonData = null ;
+                try {
+                    jsonData = response.getJSONObject("content").getString("text");
+                } catch (JSONException ex) {
+                    // content > text 가 없을 수도 있네? ex: my-pizza의 /auth/sign-in
+//                    throw new RuntimeException("응답(Response) JSON 데이터가 잘못 되었습니다.\nPATH : " + CommonUtil.cutAfterQuestion(httpSamplerDto.getPath()) + "\nJSON DATA : " + jsonData) ;
+                }
+                responseJsonDto.setText(jsonData) ;
+            }
 
-        Element testTitle = doc.createElement("elementProp");
-        testTitle.setAttribute("name", "testTitle");
-        testTitle.setAttribute("elementType", "Argument");
-        collectionProp.appendChild(testTitle) ;
-        testTitle.appendChild(XmlUtil.createTextProp(doc, "Argument.name", "testTitle")) ;
-        testTitle.appendChild(XmlUtil.createTextProp(doc, "Argument.value", "90;95")) ;
-        testTitle.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "=")) ;
+            responseJsonRepository.save(responseJsonDto.toEntity());
 
-        Element eventTags = doc.createElement("elementProp");
-        eventTags.setAttribute("name", "eventTags");
-        eventTags.setAttribute("elementType", "Argument");
-        collectionProp.appendChild(eventTags) ;
-        eventTags.appendChild(XmlUtil.createTextProp(doc, "Argument.name", "eventTags")) ;
-        eventTags.appendChild(XmlUtil.createTextProp(doc, "Argument.value", "")) ;
-        eventTags.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "=")) ;
-
-        backendListener.appendChild(XmlUtil.createTextProp(doc, "classname", "org.apache.jmeter.visualizers.backend.influxdb.InfluxdbBackendListenerClient")) ;
-
-        return backendListener ;
+            responseJsonDtoList.add(responseJsonDto) ;
+        }
+        return httpSamplerDtoList;
     }
 
     private Element createHttpSampler(Document doc, HTTPSamplerDto httpSamplerDto, int inx) {
@@ -415,18 +338,21 @@ public class HarService {
         Element collectionProp = doc.createElement("collectionProp");
         collectionProp.setAttribute("name", "Arguments.arguments");
         // "GET"에 정의된 User Defined Variables 기술
-        for (Map.Entry<String, String> entry : httpSamplerDto.getParameters().entrySet()) {
-            // Parameter 추가
-            Element httpArg = doc.createElement("elementProp");
-            httpArg.setAttribute("name", entry.getKey());
-            httpArg.setAttribute("elementType", "HTTPArgument");
-            httpArg.appendChild(XmlUtil.createTextProp(doc, "HTTPArgument.always_encode", "false")) ;
-            httpArg.appendChild(XmlUtil.createTextProp(doc, "Argument.name", entry.getKey(), "stringProp")) ;
-            httpArg.appendChild(XmlUtil.createTextProp(doc, "Argument.value", entry.getValue(), "stringProp")) ;
-            httpArg.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "=")) ;
-            httpArg.appendChild(XmlUtil.createTextProp(doc, "HTTPArgument.use_equals", "true")) ;
-            collectionProp.appendChild(httpArg) ;
-        }
+        Map<String, List<String>> queryParams = httpSamplerDto.getParameters() ;
+        queryParams.forEach((key, valueList) -> {
+            for (String value : valueList) {
+                // Parameter 추가
+                Element httpArg = doc.createElement("elementProp");
+                httpArg.setAttribute("name", key);
+                httpArg.setAttribute("elementType", "HTTPArgument");
+                httpArg.appendChild(XmlUtil.createTextProp(doc, "HTTPArgument.always_encode", "false"));
+                httpArg.appendChild(XmlUtil.createTextProp(doc, "Argument.name", key, "stringProp"));
+                httpArg.appendChild(XmlUtil.createTextProp(doc, "Argument.value", value, "stringProp"));
+                httpArg.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "="));
+                httpArg.appendChild(XmlUtil.createTextProp(doc, "HTTPArgument.use_equals", "true"));
+                collectionProp.appendChild(httpArg);
+            }
+        }) ;
         // "POST" postBodyRaw 작성
         if ( httpSamplerDto.isPostBodyRaw() ) {
             // Parameter 추가
@@ -632,6 +558,66 @@ public class HarService {
         collector.setAttribute("guiclass", "kg.apc.jmeter.vizualizers.ResponseTimesOverTimeGui");
         collector.setAttribute("testclass", "kg.apc.jmeter.vizualizers.CorrectedResultCollector");
         collector.setAttribute("testname", "[결과 그래프] 응답시간");
+
+        collector.appendChild(XmlUtil.createTextProp(doc, "ResultCollector.error_logging", "false"));
+
+        Element objProp = doc.createElement("objProp");
+        Element name = doc.createElement("name");
+        name.setTextContent("saveConfig");
+        objProp.appendChild(name);
+
+        Element value = doc.createElement("value");
+        value.setAttribute("class", "SampleSaveConfiguration");
+
+        String[] trueFields = {
+                "time", "latency", "timestamp", "success", "label", "code", "message", "threadName",
+                "dataType", "assertions", "subresults", "fieldNames", "saveAssertionResultsFailureMessage",
+                "bytes", "sentBytes", "url", "threadCounts", "idleTime", "connectTime"
+        };
+
+        String[] falseFields = {
+                "encoding", "responseData", "samplerData", "xml", "responseHeaders",
+                "requestHeaders", "responseDataOnError"
+        };
+
+        for (String field : trueFields) {
+            Element el = doc.createElement(field);
+            el.setTextContent("true");
+            value.appendChild(el);
+        }
+
+        for (String field : falseFields) {
+            Element el = doc.createElement(field);
+            el.setTextContent("false");
+            value.appendChild(el);
+        }
+
+        Element assertion = doc.createElement("assertionsResultsToSave");
+        assertion.setTextContent("0");
+        value.appendChild(assertion);
+
+        objProp.appendChild(value);
+
+        collector.appendChild(objProp);
+        collector.appendChild(XmlUtil.createTextProp(doc, "filename", harUploadDto.getJmxFileNm().replace(".jmx", ".jtl")));
+        collector.appendChild(XmlUtil.createTextProp(doc, "interval_grouping", "500"));
+        collector.appendChild(XmlUtil.createTextProp(doc, "graph_aggregated", "false"));
+        collector.appendChild(XmlUtil.createTextProp(doc, "include_sample_labels", ""));
+        collector.appendChild(XmlUtil.createTextProp(doc, "exclude_sample_labels", ""));
+        collector.appendChild(XmlUtil.createTextProp(doc, "start_offset", ""));
+        collector.appendChild(XmlUtil.createTextProp(doc, "end_offset", ""));
+        collector.appendChild(XmlUtil.createTextProp(doc, "include_checkbox_state", "false"));
+        collector.appendChild(XmlUtil.createTextProp(doc, "exclude_checkbox_state", "false"));
+
+        return collector ;
+    }
+
+    private Element createStatisticsTable(Document doc, HarUploadDto harUploadDto) {
+        // 그래프 콜렉터 엘리먼트 생성
+        Element collector = doc.createElement("ResultCollector");
+        collector.setAttribute("guiclass", "my.jmeter.plugin.visualizer.StatVisualizer");
+        collector.setAttribute("testclass", "ResultCollector");
+        collector.setAttribute("testname", "[결과 테이블] 대시보드 (표)");
 
         collector.appendChild(XmlUtil.createTextProp(doc, "ResultCollector.error_logging", "false"));
 
@@ -906,7 +892,7 @@ public class HarService {
         Element collector = doc.createElement("ResultCollector");
         collector.setAttribute("guiclass", "ViewResultsFullVisualizer");
         collector.setAttribute("testclass", "ResultCollector");
-        collector.setAttribute("testname", "[View Result Tree] 결과확인");
+        collector.setAttribute("testname", "[결과 확인] View Result Tree");
         collector.setAttribute("enabled", "true");
         return collector;
     }
@@ -982,4 +968,100 @@ public class HarService {
 //
 //        return elementProp;
 //    }
+
+    private Element createBackendListener(Document doc, HarUploadDto harUploadDto) {
+        Element backendListener = doc.createElement("BackendListener");
+        backendListener.setAttribute("guiclass", "BackendListenerGui");
+        backendListener.setAttribute("testclass", "BackendListener");
+        backendListener.setAttribute("testname", "InfluxDB 1.8 Listener" );
+        backendListener.setAttribute("enabled", "false");
+
+        // "GET"/"POST" method용 User Defined Variables
+        Element elementProp = doc.createElement("elementProp");
+        elementProp.setAttribute("name", "arguments");
+        elementProp.setAttribute("elementType", "Arguments");
+        elementProp.setAttribute("guiclass", "ArgumentsPanel");
+        elementProp.setAttribute("testclass", "Arguments");
+        backendListener.appendChild(elementProp) ;
+
+        Element collectionProp = doc.createElement("collectionProp");
+        collectionProp.setAttribute("name", "Arguments.arguments");
+        elementProp.appendChild(collectionProp) ;
+
+        Element influxdbMetricsSender = doc.createElement("elementProp");
+        influxdbMetricsSender.setAttribute("name", "influxdbMetricsSender");
+        influxdbMetricsSender.setAttribute("elementType", "Argument");
+        collectionProp.appendChild(influxdbMetricsSender) ;
+        influxdbMetricsSender.appendChild(XmlUtil.createTextProp(doc, "Argument.name", "influxdbMetricsSender")) ;
+        influxdbMetricsSender.appendChild(XmlUtil.createTextProp(doc, "Argument.value", "org.apache.jmeter.visualizers.backend.influxdb.HttpMetricsSender")) ;
+        influxdbMetricsSender.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "=")) ;
+
+        Element influxdbUrl = doc.createElement("elementProp");
+        influxdbUrl.setAttribute("name", "influxdbUrl");
+        influxdbUrl.setAttribute("elementType", "Argument");
+        collectionProp.appendChild(influxdbUrl) ;
+        influxdbUrl.appendChild(XmlUtil.createTextProp(doc, "Argument.name", "influxdbUrl")) ;
+        influxdbUrl.appendChild(XmlUtil.createTextProp(doc, "Argument.value", "http://localhost:8086/write?db=jmeter")) ;
+        influxdbUrl.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "=")) ;
+
+        Element application = doc.createElement("elementProp");
+        application.setAttribute("name", "application");
+        application.setAttribute("elementType", "Argument");
+        collectionProp.appendChild(application) ;
+        application.appendChild(XmlUtil.createTextProp(doc, "Argument.name", "application")) ;
+        application.appendChild(XmlUtil.createTextProp(doc, "Argument.value", harUploadDto.getPrjNm())) ;
+        application.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "=")) ;
+
+        Element measurement = doc.createElement("elementProp");
+        measurement.setAttribute("name", "measurement");
+        measurement.setAttribute("elementType", "Argument");
+        collectionProp.appendChild(measurement) ;
+        measurement.appendChild(XmlUtil.createTextProp(doc, "Argument.name", "measurement")) ;
+        measurement.appendChild(XmlUtil.createTextProp(doc, "Argument.value", "jmeter")) ;
+        measurement.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "=")) ;
+
+        Element summaryOnly = doc.createElement("elementProp");
+        summaryOnly.setAttribute("name", "summaryOnly");
+        summaryOnly.setAttribute("elementType", "Argument");
+        collectionProp.appendChild(summaryOnly) ;
+        summaryOnly.appendChild(XmlUtil.createTextProp(doc, "Argument.name", "summaryOnly")) ;
+        summaryOnly.appendChild(XmlUtil.createTextProp(doc, "Argument.value", "false")) ;
+        summaryOnly.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "=")) ;
+
+        Element samplersRegex = doc.createElement("elementProp");
+        samplersRegex.setAttribute("name", "samplersRegex");
+        samplersRegex.setAttribute("elementType", "Argument");
+        collectionProp.appendChild(samplersRegex) ;
+        samplersRegex.appendChild(XmlUtil.createTextProp(doc, "Argument.name", "samplersRegex")) ;
+        samplersRegex.appendChild(XmlUtil.createTextProp(doc, "Argument.value", "^■.*")) ;
+        samplersRegex.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "=")) ;
+
+        Element percentiles = doc.createElement("elementProp");
+        percentiles.setAttribute("name", "percentiles");
+        percentiles.setAttribute("elementType", "Argument");
+        collectionProp.appendChild(percentiles) ;
+        percentiles.appendChild(XmlUtil.createTextProp(doc, "Argument.name", "percentiles")) ;
+        percentiles.appendChild(XmlUtil.createTextProp(doc, "Argument.value", "90;95")) ;
+        percentiles.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "=")) ;
+
+        Element testTitle = doc.createElement("elementProp");
+        testTitle.setAttribute("name", "testTitle");
+        testTitle.setAttribute("elementType", "Argument");
+        collectionProp.appendChild(testTitle) ;
+        testTitle.appendChild(XmlUtil.createTextProp(doc, "Argument.name", "testTitle")) ;
+        testTitle.appendChild(XmlUtil.createTextProp(doc, "Argument.value", "90;95")) ;
+        testTitle.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "=")) ;
+
+        Element eventTags = doc.createElement("elementProp");
+        eventTags.setAttribute("name", "eventTags");
+        eventTags.setAttribute("elementType", "Argument");
+        collectionProp.appendChild(eventTags) ;
+        eventTags.appendChild(XmlUtil.createTextProp(doc, "Argument.name", "eventTags")) ;
+        eventTags.appendChild(XmlUtil.createTextProp(doc, "Argument.value", "")) ;
+        eventTags.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "=")) ;
+
+        backendListener.appendChild(XmlUtil.createTextProp(doc, "classname", "org.apache.jmeter.visualizers.backend.influxdb.InfluxdbBackendListenerClient")) ;
+
+        return backendListener ;
+    }
 }

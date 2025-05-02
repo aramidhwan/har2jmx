@@ -74,7 +74,7 @@ public class TestFragmentService {
         // --------- (2) TestFragmentController용 hashTree ---------
         Element tfHashTree = doc.createElement("hashTree");
 
-        // --------- (3) TransactionController 추가 ---------
+        // --------- (3) 로그인 액션용 TransactionController 추가 ---------
         Element txController = doc.createElement("TransactionController");
         txController.setAttribute("guiclass", "TransactionControllerGui");
         txController.setAttribute("testclass", "TransactionController");

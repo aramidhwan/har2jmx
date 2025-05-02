@@ -120,6 +120,7 @@ public class Har2JmxController {
 
         try {
             List<String> msgs = jmxService.convertJMX(jmxFileNm, prjNm, tcNm, keywordKeyNm, keyword) ;
+            List<ResponseJsonDto> responseJsonDtoList = jmxService.getDBSamplerList(prjNm, tcNm) ;
 
             // 성공 시 메시지 추가
             JSONArray jsonArray = new JSONArray();
@@ -132,7 +133,7 @@ public class Har2JmxController {
             ResponseDto responseDto = ResponseDto.builder()
                     .BIZ_SUCCESS(0)
                     .msg(finalMsg)
-//                    .data(jsonArray.toString())
+                    .data(responseJsonDtoList)
                     .build();
             return ResponseEntity.ok(responseDto) ;
 

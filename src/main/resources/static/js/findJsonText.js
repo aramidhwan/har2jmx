@@ -66,7 +66,7 @@ document.addEventListener("DOMContentLoaded", () => {
         cell.innerHTML = highlighted;
     });
 
-    // keyword input에서 엔터 시 실행
+    // keyword input에서 엔터 시 submit
     document.getElementById("findJsonForm").addEventListener("submit", function(e) {
         e.preventDefault(); // 기본 submit 방지
         fnLoadFindData() ;
@@ -210,7 +210,7 @@ function fnCreateFindTR(responseDataDto) {
     }
 
     var newCell4 = newRow.insertCell(); // Response JSON
-    newCell4.innerHTML = `<button id='btnCopyJmeter' value='${keywordValue}'>JMETER</button>`;
+    newCell4.innerHTML = `<button id='btnCopyJmeter' value='${keywordValue}'>클립보드</button>`;
 
     var newCell5 = newRow.insertCell();    // Response JSON
     newCell5.classList.add("jsonData") ;
@@ -321,7 +321,7 @@ function fnConvertJMX() {
     if ( jsonExtractorAddedKeywords.has(keywordValue) ) {
         keywordKeyNm = jsonExtractorAddedKeywords.get(keywordValue).split("^")[1] ;
     } else {
-        const userInput = prompt("⚠️ JSON Extractor를 먼저 추가하거나, keyword("+keywordValue+")를 추출한 변수명을 입력하세요. ex: projectUid\n\n'" + keywordValue + "'를 입력한 변수명으로 대체합니다. ex: ${projectUid}");
+        const userInput = prompt("⚠️ JSON Extractor를 먼저 추가하거나, keyword("+keywordValue+")를 추출한 변수명을 입력하세요. ex: projectUid\n\n'" + keywordValue + "'를 입력한 변수명으로 대체합니다.\nex: projectUid → ${projectUid}");
 
         if (userInput !== null && userInput.trim() !== "") {
             keywordKeyNm = userInput ;
@@ -348,10 +348,52 @@ function fnConvertJMX() {
         })
     } ;
 
-    callFetchApi(url, null, params, null) ;
+    callFetchApi(url, null, params, "fnConvertJMX_CALLBACK") ;
 }
 
-function fnConvertJMX_CALLBACK(json) {
+function fnConvertJMX_CALLBACK(jsonData) {
+
+    let cellIndex = 0 ;
+    const tblSamplerList = document.getElementById("tblSamplerList");
+
+    const tbody = tblSamplerList.querySelector("tbody"); // tbody 요소를 선택
+    tbody.innerHTML = ""; // tbody 내 모든 내용을 삭제
+
+    for (let inx = 0; inx < jsonData.data.length; inx++) {
+        cellIndex = 0 ;
+        const ResponseJsonDto = jsonData.data[inx];
+
+        // 선택된 메뉴 내용 표시
+        var newRow = tbody.insertRow(tbody.rows.length);
+
+        var newCell1 = newRow.insertCell(cellIndex++);    // #
+        newCell1.classList.add("path-cell") ;
+        newCell1.innerText = ResponseJsonDto.path ;
+    }
+
+    // -------------------------------
+    // [Modal] 창의 [Path]의 숫자부분 하이라이트 처리
+    // -------------------------------
+    const pathCells = document.querySelectorAll(".path-cell");
+    pathCells.forEach(cell => {
+        const original = cell.textContent;
+        const highlighted = original.replace(/(\d+)/g, '<span class="text-danger fw-bold">$1</span>');
+        cell.innerHTML = highlighted;
+    });
+    // -------------------------------
+    // [Modal] 창의 [Path]의 ${변수명} 하이라이트 처리
+    // -------------------------------
+    const pattern = /\$\{.*?\}/g;
+    pathCells.forEach(cell => {
+        const original = cell.textContent;
+        if (pattern.test(original)) {
+            const highlighted = original.replace(pattern, match => `<span class="text-primary fw-bold">${match}</span>`);
+            cell.innerHTML = highlighted;
+        }
+    });
+}
+
+function fnConvertJMX_CALLBACK_bakup(json) {
     const tblData = document.getElementById("tblConvertJMXResult");
     tbody = tblData.querySelector("tbody"); // tbody 요소를 선택
 

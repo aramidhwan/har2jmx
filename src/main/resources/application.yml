@@ -15,8 +15,8 @@ spring:
 #      minimum-idle: 10 #최소 pool 크기
 
     driver-class-name: org.h2.Driver
-    url: jdbc:h2:mem:harparsordb;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE # DB_CLOSE_DELAY=-1: 애플리케이션 종료 전까지 DB 유지
-#    url: jdbc:h2:file:~/harparsordb;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE # DB_CLOSE_DELAY=-1: 애플리케이션 종료 전까지 DB 유지
+    url: jdbc:h2:mem:har2jmx;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE # DB_CLOSE_DELAY=-1: 애플리케이션 종료 전까지 DB 유지
+#    url: jdbc:h2:file:~/har2jmx;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE # DB_CLOSE_DELAY=-1: 애플리케이션 종료 전까지 DB 유지
     username: sa
     password:
   h2:
@@ -31,7 +31,7 @@ spring:
         format_sql: true          # SQL 예쁘게 정렬해서 출력
     hibernate:
       ddl-auto: create      # 필요 시 create, create-drop, none, validate 등
-    database-platform: org.hibernate.dialect.H2Dialect
+#    database-platform: org.hibernate.dialect.H2Dialect
 
   servlet:
     multipart:
@@ -45,8 +45,8 @@ spring:
 
 logging:
   level:
-    com.shshin.harParsor: DEBUG
-#    org.hibernate.type: trace
+    com.shshin: DEBUG
+    org.hibernate: WARN
 
 harParsor:
   queryString:

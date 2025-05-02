@@ -28,4 +28,8 @@ public class ResponseJson {
     @Lob
     @Column(columnDefinition = "MEDIUMTEXT")
     private String text;
+
+    public void setPath(String path) {
+        this.path = path ;
+    }
 }
