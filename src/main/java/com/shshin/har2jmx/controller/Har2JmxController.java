@@ -8,6 +8,8 @@ import com.shshin.har2jmx.service.HarService;
 import com.shshin.har2jmx.service.JmxService;
 import com.shshin.har2jmx.service.TestFragmentService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -59,13 +61,15 @@ public class Har2JmxController {
         return "" ;
     }
 
-    @Operation(summary = "HAR 파일 업로드", description = "HAR 파일을 업로드하여 JMX 파일 생성")
-    
+    @Operation(summary = "HAR 파일 업로드", description = "HAR 파일을 업로드하여 JMX 파일을 생성합니다.",
+            parameters = {
+                    @Parameter(in = ParameterIn.HEADER, name = "HarUploadDto", description = "test1", required = true, example = "test1"),
+                    @Parameter(in = ParameterIn.HEADER, name = "Model", description = "test3", required = true, example = "test3")
+            })
     @PostMapping("/uploadHarFile")
     public String uploadHarFile(@ModelAttribute HarUploadDto harUploadDto, Model model) {
         try {
             // make Sampler
-//            List<ResponseJsonDto> responseJsonDtoList = harService.makeJmxFile(harUploadDto);
             List<ResponseJsonDto> responseJsonDtoList = harService.makeJmxFile(harUploadDto);
 
             // 성공 시 메시지 추가

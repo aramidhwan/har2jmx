@@ -20,4 +20,11 @@ public class HarUploadDto {
     private String excludePaths;
     private String excludeContainPaths;
     private String jmxFileNm;
+
+//    public String getServerIp() {
+//        return (serverIp!=null)? serverIp:"" ;
+//    }
+    public String getExcludePostfix() {
+        return (excludePostfix!=null)? excludePostfix:"" ;
+    }
 }

@@ -54,7 +54,11 @@ public class CommonUtil {
     }
 
     public static String getPath(String serverIp, JSONObject request) {
-        String path = request.getString("url").replace(serverIp, "") ;
+        String path = request.getString("url") ;
+        if (serverIp!=null) {
+            path = path.replace(serverIp, "") ;
+        }
+
         if ( !"PATH-PARAMETER-TYPE".equals(getQueryStringType()) ) {
             path = cutAfterQuestion(path);
         }

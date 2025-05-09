@@ -319,7 +319,7 @@ public class TestFragmentService {
         httpArg.setAttribute("elementType", "HTTPArgument");
 
         httpArg.appendChild(XmlUtil.createTextProp(doc, "HTTPArgument.always_encode", "false"));
-        httpArg.appendChild(XmlUtil.createTextProp(doc, "Argument.value", loginActionSampler.getPostData(), "stringProp"));
+        httpArg.appendChild(XmlUtil.createTextProp(doc, "Argument.value", loginActionSampler.getPostData_text(), "stringProp"));
         httpArg.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "=", "stringProp"));
 
         // HTTPArgument를 collectionProp에 추가

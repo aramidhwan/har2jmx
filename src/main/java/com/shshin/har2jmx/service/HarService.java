@@ -61,7 +61,7 @@ public class HarService {
         StringBuilder harFileJsonContent = makeHarFileJsonContent(harUploadDto) ;
 
         // HAR entries [배열] (개별 url)
-        JSONArray txList = getTransactionList(harFileJsonContent);
+//        JSONArray txList = getEntries(harFileJsonContent);
 
         // Sampler마다 반복 호출 > HTTPSamplerDto 리스트 만들기
         List<HTTPSamplerDto> httpSamplerDtoList = makeHttpSamplerDtoList(harUploadDto, responseJsonDtoList);
@@ -115,29 +115,31 @@ public class HarService {
         testPlanHashTree.appendChild(variables1);
         testPlanHashTree.appendChild(doc.createElement("hashTree"));
 
-        // -------- [환경변수] JSR223 Assertion 제외 목록 (code==200) ------
-        // 변수 추가 : excludePaths
-        variables = new LinkedHashMap<>();
-        var1 = new HashMap<>();
-        var1.put("value", "/ko, /ko-1, /ko-2");
-        var1.put("comment", "Assertion 대상 제외 목록 (exact match)");
-        variables.put("excludePaths", var1);
-        // 변수 추가 : excludeContainPaths
-        var2 = new HashMap<>();
-        var2.put("value", "/js/, /css/, /images/, /image/, /img/, /ko");
-        var2.put("comment", "Assertion 대상 제외 목록 (contains match)");
-        variables.put("excludeContainPaths", var2);
+        // -------- [JSR223 Assertion] 생성 - [응답 검증] JSR223 Assertion (code==200) ------
+        if ( StringUtils.hasText(harUploadDto.getAssertionCode()) ) {
+            // -------- [환경변수] JSR223 Assertion 제외 목록 (code==200) ------
+            // 변수 추가 : excludePaths
+            variables = new LinkedHashMap<>();
+            var1 = new HashMap<>();
+            var1.put("value", harUploadDto.getExcludePaths());
+            var1.put("comment", "Assertion 대상 제외 목록 (exact match)");
+            variables.put("excludePaths", var1);
+            // 변수 추가 : excludeContainPaths
+            var2 = new HashMap<>();
+            var2.put("value", harUploadDto.getExcludeContainPaths());
+            var2.put("comment", "Assertion 대상 제외 목록 (contains match)");
+            variables.put("excludeContainPaths", var2);
 
-        // User Defined Variables 생성
-        testname = "[환경변수] JSR223 Assertion 제외 목록 ("+harUploadDto.getAssertionCode()+")" ;
-        Element variables2 = createVariables(doc, testname, null, variables);
-        testPlanHashTree.appendChild(variables2);
-        testPlanHashTree.appendChild(doc.createElement("hashTree"));
+            // [User Defined Variables] 생성 - [환경변수] JSR223 Assertion 제외 목록
+            testname = "[환경변수] JSR223 Assertion 제외 목록 ("+harUploadDto.getAssertionCode()+")" ;
+            Element variables2 = createVariables(doc, testname, null, variables);
+            testPlanHashTree.appendChild(variables2);
+            testPlanHashTree.appendChild(doc.createElement("hashTree"));
 
-        // -------- [JSR223 Assertion] [응답 검증] JSR223 Assertion (code==200) ------
-        Element jsr223Assertion = createJSR223Assertion(doc, harUploadDto);
-        testPlanHashTree.appendChild(jsr223Assertion);
-        testPlanHashTree.appendChild(doc.createElement("hashTree"));
+            Element jsr223Assertion = createJSR223Assertion(doc, harUploadDto);
+            testPlanHashTree.appendChild(jsr223Assertion);
+            testPlanHashTree.appendChild(doc.createElement("hashTree"));
+        }
 
         // ------------------ [결과 그래프] TPS ----------------
         Element tpsGraph = createTpsGraph(doc, harUploadDto) ;
@@ -188,7 +190,7 @@ public class HarService {
 
         // -------- [ThreadGroup] > [Transaction Controller] > [HTTPSamplerProxy][HeaderManager][JWT JSON Extractor] 만들기 ------
         for (int inx = 0 ; inx < httpSamplerDtoList.size() ; inx++ ) {
-            // "로그인 액션" Sampler 인 경우.xxx
+            // "로그인 액션" Sampler 인 경우.
             if ( CommonUtil.isLoginAction(httpSamplerDtoList.get(inx)) ) {
                 this.loginActionSampler = httpSamplerDtoList.get(inx) ;
                 // testname : 정규표현식: [DTC숫자-00] 구조에서 "숫자" 부분만 ${tcNo}로 대체
@@ -258,13 +260,13 @@ public class HarService {
         StringBuilder harFileJsonContent = makeHarFileJsonContent(harUploadDto) ;
 
         // HAR entries [배열] (개별 url)
-        JSONArray txList = getTransactionList(harFileJsonContent);
+        JSONArray entries = getEntries(harFileJsonContent);
 
         // Sampler마다 반복 호출 > HTTPSamplerDto 리스트 만들기
-        for (int inx = 0; inx < txList.length(); inx++) {
-            JSONObject response = txList.getJSONObject(inx).getJSONObject("response");
+        for (int inx = 0; inx < entries.length(); inx++) {
+            JSONObject response = entries.getJSONObject(inx).getJSONObject("response");
             // HTTPSamplerDto 만들기
-            HTTPSamplerDto httpSamplerDto = makeHttpSamplerDto(harUploadDto, txList.getJSONObject(inx)) ;
+            HTTPSamplerDto httpSamplerDto = makeHttpSamplerDto(harUploadDto, entries.getJSONObject(inx)) ;
 
             // "Sampler 만들기"에서 제외할 확장자는 건너띄기(continue) (.js .css .gif 등)
             if (EXCLUDE_POSTFIX.stream().anyMatch(CommonUtil.cutAfterQuestion(httpSamplerDto.getPath())::endsWith)) {
@@ -273,8 +275,13 @@ public class HarService {
 
             // 콘솔 출력
             System.out.println("\n### path : [" + httpSamplerDto.getMethod() + "] " + httpSamplerDto.getPath());
-            for (int iny = 0; iny < httpSamplerDto.getQueryArray().length(); iny++) {
-                System.out.println("###        Param[" + iny + "] : " + httpSamplerDto.getQueryArray().getJSONObject(iny).getString("name") + " = " + httpSamplerDto.getQueryArray().getJSONObject(iny).getString("value"));
+            Map<String, List<String>> parameterList = httpSamplerDto.getQueryStrings() ;
+            for (Map.Entry<String, List<String>> entry : parameterList.entrySet()) {
+                String key = entry.getKey();
+                List<String> values = entry.getValue();
+                for (String value : values) {
+                    System.out.println("###        Param : " + key + "=" + value);
+                }
             }
 
             // HTTPSamplerDto 리스트에 추가
@@ -310,6 +317,53 @@ public class HarService {
         return httpSamplerDtoList;
     }
 
+    private HTTPSamplerDto makeHttpSamplerDto(HarUploadDto harUploadDto, JSONObject tx) {
+        JSONObject request = tx.getJSONObject("request");
+        JSONObject response = tx.getJSONObject("response");
+        String path = CommonUtil.getPath(harUploadDto.getServerIp(), request);
+        // "GET", "POST", "PATCH" 등
+        String method = request.getString("method");
+        // "POST" 방식일 때 post data
+        JSONObject postData = null ;
+        if ( request.has("postData") ) {
+            postData = request.getJSONObject("postData") ;
+        }
+        // "GET" 방식일 때 파라미터 배열
+        JSONArray queryString = "PATH-PARAMETER-TYPE".equals(QUERY_STRING_TYPE)? new JSONArray():request.getJSONArray("queryString");
+
+        // Headers 추가
+        JSONArray headers = request.getJSONArray("headers") ;
+        Map<String, String> headerMap = new HashMap<>() ;
+        for (int inx = 0; inx < headers.length(); inx++) {
+            JSONObject header = headers.getJSONObject(inx);
+            String name = header.getString("name");
+            String value = header.getString("value");
+            headerMap.put(name, value) ;
+        }
+        HTTPSamplerDto httpSamplerDto = HTTPSamplerDto.builder()
+                .testname("[DTC"+String.format("%02d", harUploadDto.getDTCNo())+"-$dtcNoIndex$][" + harUploadDto.getDTCName() + "] " + CommonUtil.cutAfterQuestion(path))
+                .path(path)
+                .method(method)
+                .postData(postData)
+                // "GET" Parameters
+                .queryString(queryString)
+                .jwtTokenKeyNm(harUploadDto.getJwtTokenKeyNm())
+                .response(response)
+                .headerManagerDto(HeaderManagerDto.builder()
+                        .testname("Header Manager Each")
+                        .headers(headerMap)
+                        .build()
+                )
+                .build() ;
+
+        // "로그인 액션"인 경우 jwtJsonPathExprs 값 셋팅
+        if ( StringUtils.hasText(harUploadDto.getJwtTokenKeyNm()) ) {
+            CommonUtil.isLoginAction(httpSamplerDto) ;
+        }
+
+        return httpSamplerDto ;
+    }
+
     private Element createHttpSampler(Document doc, HTTPSamplerDto httpSamplerDto, int inx) {
         Element httpSampler = doc.createElement("HTTPSamplerProxy");
         httpSampler.setAttribute("guiclass", "HttpTestSampleGui");
@@ -321,14 +375,61 @@ public class HarService {
         httpSampler.appendChild(XmlUtil.createTextProp(doc, "HTTPSampler.follow_redirects", "true"));
         httpSampler.appendChild(XmlUtil.createTextProp(doc, "HTTPSampler.method", httpSamplerDto.getMethod()));
         httpSampler.appendChild(XmlUtil.createTextProp(doc, "HTTPSampler.use_keepalive", "true"));
+        // 파일 업로드 "multipart/form-data" 처리
+        String uploadFileVarName = null, uploadFileName = null, contentType = null ;
+        if ( httpSamplerDto.getPostData_mimeType().startsWith("multipart/form-data") ) {
+            httpSampler.appendChild(XmlUtil.createTextProp(doc, "HTTPSampler.DO_MULTIPART_POST", "true"));
+            Element elemPropFiles = doc.createElement("elementProp");
+            elemPropFiles.setAttribute("elementType", "HTTPFileArgs");
+            elemPropFiles.setAttribute("name", "HTTPsampler.Files");
+            httpSampler.appendChild(elemPropFiles) ;
+
+            Element collectPropFiles = doc.createElement("collectionProp");
+            collectPropFiles.setAttribute("name", "HTTPFileArgs.files");
+            elemPropFiles.appendChild(collectPropFiles) ;
+
+            // 정규식으로 업로드할 파일의 변수명(name)과 filename 값을 추출
+//            String regex = "name=&quot;([^&]+)&quot;[^f]+filename=&quot;([^&]+)&quot;";
+            // name=" : name="로 시작하는 부분을 찾음
+            // ([^"]+) : 큰따옴표가 아닌 문자들을 하나 이상 찾음 (name 부분)
+            // [^f]+ : filename 이전까지의 모든 문자
+            // filename=" : filename="으로 시작하는 부분을 찾음
+            // ([^"]+) : 큰따옴표가 아닌 문자들을 하나 이상 찾음 (filename 부분)
+//            String regex = "name=\"([^\"]+)\"[^f]+filename=\"([^\"]+)\"";
+            // name="([^"]+)" : name의 값을 추출
+            // [^f]+ : filename 이전의 모든 문자
+            // filename="([^"]+)" : 파일명을 추출
+            // [^C]+ : Content-Type 이전의 모든 문자
+            // Content-Type: ([^\\r\\n]+) : Content-Type의 값을 추출
+            String regex = "name=\"([^\"]+)\"[^f]+filename=\"([^\"]+)\"[^C]+Content-Type: ([^\\r\\n]+)";
+
+            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(regex);
+            java.util.regex.Matcher matcher = pattern.matcher(httpSamplerDto.getPostData_text());
+            while (matcher.find()) {
+                uploadFileVarName = matcher.group(1);
+                uploadFileName = matcher.group(2);
+                contentType = matcher.group(3);
+                System.out.println("파일 업로드 감지!(multipart/form-data) : 추출된 변수명 = " + uploadFileVarName + ", 추출된 파일명 = " + uploadFileName);
+            }
+
+            Element elemPropFileArg = doc.createElement("elementProp");
+            elemPropFileArg.setAttribute("name", uploadFileName);
+            elemPropFileArg.setAttribute("elementType", "HTTPFileArg");
+            elemPropFileArg.appendChild(XmlUtil.createTextProp(doc, "File.mimetype", contentType));
+            elemPropFileArg.appendChild(XmlUtil.createTextProp(doc, "File.path", uploadFileName));
+            elemPropFileArg.appendChild(XmlUtil.createTextProp(doc, "File.paramname", "harFile"));
+            collectPropFiles.appendChild(elemPropFileArg) ;
+        }
         httpSampler.appendChild(XmlUtil.createTextProp(doc, "HTTPSampler.postBodyRaw", String.valueOf(httpSamplerDto.isPostBodyRaw())));
 
         // "GET"/"POST" method용 User Defined Variables
         Element elementProp = doc.createElement("elementProp");
         elementProp.setAttribute("elementType", "Arguments");
         elementProp.setAttribute("name", "HTTPsampler.Arguments");
-        // "GET" 전용 User Defined Variables 추가 설정
-        if ( !httpSamplerDto.isPostBodyRaw() ) {
+        // "GET" 전용 User Defined Variables 추가 설정 (!httpSamplerDto.isPostBodyRaw())
+        // "POST" "multipart/form-data" 용 User Defined Variables 추가 설정 (!postDataParams.isEmpty())
+        Map<String, List<String>> postDataParams = httpSamplerDto.getPostData_params() ;
+        if ( !httpSamplerDto.isPostBodyRaw() || !postDataParams.isEmpty()) {
             elementProp.setAttribute("guiclass", "HTTPArgumentsPanel");
             elementProp.setAttribute("testclass", "Arguments");
             elementProp.setAttribute("testname", "User Defined Variables");
@@ -338,8 +439,28 @@ public class HarService {
         Element collectionProp = doc.createElement("collectionProp");
         collectionProp.setAttribute("name", "Arguments.arguments");
         // "GET"에 정의된 User Defined Variables 기술
-        Map<String, List<String>> queryParams = httpSamplerDto.getParameters() ;
-        queryParams.forEach((key, valueList) -> {
+        Map<String, List<String>> queryStrings = httpSamplerDto.getQueryStrings() ;
+        queryStrings.forEach((key, valueList) -> {
+            for (String value : valueList) {
+                // Parameter 추가
+                Element httpArg = doc.createElement("elementProp");
+                httpArg.setAttribute("name", key);
+                httpArg.setAttribute("elementType", "HTTPArgument");
+                httpArg.appendChild(XmlUtil.createTextProp(doc, "HTTPArgument.always_encode", "false"));
+                httpArg.appendChild(XmlUtil.createTextProp(doc, "Argument.name", key, "stringProp"));
+                httpArg.appendChild(XmlUtil.createTextProp(doc, "Argument.value", value, "stringProp"));
+                httpArg.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "="));
+                httpArg.appendChild(XmlUtil.createTextProp(doc, "HTTPArgument.use_equals", "true"));
+                collectionProp.appendChild(httpArg);
+            }
+        }) ;
+        // "POST" "multipart/form-data"에 정의된 User Defined Variables 기술
+        String finalUploadFileVarName = uploadFileVarName;
+        postDataParams.forEach((key, valueList) -> {
+            // 업로드 파일의 변수명일 경우 상단에서 이미 처리완료됨.
+            if ( key.equals(finalUploadFileVarName) ) {
+                return;
+            }
             for (String value : valueList) {
                 // Parameter 추가
                 Element httpArg = doc.createElement("elementProp");
@@ -360,7 +481,7 @@ public class HarService {
             postDataElement.setAttribute("name", "");
             postDataElement.setAttribute("elementType", "HTTPArgument");
             postDataElement.appendChild(XmlUtil.createTextProp(doc, "HTTPArgument.always_encode", "false")) ;
-            postDataElement.appendChild(XmlUtil.createTextProp(doc, "Argument.value", httpSamplerDto.getPostData(), "stringProp")) ;
+            postDataElement.appendChild(XmlUtil.createTextProp(doc, "Argument.value", httpSamplerDto.getPostData_text(), "stringProp")) ;
             postDataElement.appendChild(XmlUtil.createTextProp(doc, "Argument.metadata", "=")) ;
             collectionProp.appendChild(postDataElement) ;
         }
@@ -370,57 +491,7 @@ public class HarService {
         return httpSampler;
     }
 
-    private HTTPSamplerDto makeHttpSamplerDto(HarUploadDto harUploadDto, JSONObject tx) {
-        JSONObject request = tx.getJSONObject("request");
-        JSONObject response = tx.getJSONObject("response");
-        String path = CommonUtil.getPath(harUploadDto.getServerIp(), request);
-        // "GET", "POST", "PATCH" 등
-        String method = request.getString("method");
-        // "POST" 방식일 때 post data
-        JSONObject postData = null ;
-        if ( "POST".equals(method) && request.has("postData") ) {
-            postData = request.getJSONObject("postData") ;
-        }
-        boolean postBodyRaw = (postData != null);
-        // "GET" 방식일 때 파라미터 배열
-        JSONArray queryArray = "PATH-PARAMETER-TYPE".equals(QUERY_STRING_TYPE)? new JSONArray():request.getJSONArray("queryString");
-
-        // Headers 추가
-        JSONArray headers = request.getJSONArray("headers") ;
-        Map<String, String> headerMap = new HashMap<>() ;
-        for (int inx = 0; inx < headers.length(); inx++) {
-            JSONObject header = headers.getJSONObject(inx);
-            String name = header.getString("name");
-            String value = header.getString("value");
-            headerMap.put(name, value) ;
-        }
-
-        HTTPSamplerDto httpSamplerDto = HTTPSamplerDto.builder()
-                .testname("[DTC"+String.format("%02d", harUploadDto.getDTCNo())+"-$dtcNoIndex$][" + harUploadDto.getDTCName() + "] " + CommonUtil.cutAfterQuestion(path))
-                .path(path)
-                .method(method)
-                .postBodyRaw(postBodyRaw)
-                .postData(postBodyRaw? postData.getString("text"):null)
-                // "GET" Parameters
-                .queryArray(queryArray)
-                .jwtTokenKeyNm(harUploadDto.getJwtTokenKeyNm())
-                .response(response)
-                .headerManagerDto(HeaderManagerDto.builder()
-                        .testname("Header Manager Each")
-                        .headers(headerMap)
-                        .build()
-                )
-                .build() ;
-
-        // "로그인 액션"인 경우 jwtJsonPathExprs 값 셋팅
-        if ( StringUtils.hasText(harUploadDto.getJwtTokenKeyNm()) ) {
-            CommonUtil.isLoginAction(httpSamplerDto) ;
-        }
-
-        return httpSamplerDto ;
-    }
-
-    private JSONArray getTransactionList(StringBuilder harFileJsonContent) {
+    private JSONArray getEntries(StringBuilder harFileJsonContent) {
         // HAR JSON 데이터 Root
         JSONObject root = new JSONObject(harFileJsonContent.toString());
         // HAR log [단건]
@@ -763,9 +834,21 @@ public class HarService {
         config.setAttribute("testname", "[환경변수] " + harUploadDto.getServerIp());
         config.setAttribute("enabled", "true");
 
-        String protocol = harUploadDto.getServerIp().startsWith("https")? "https":harUploadDto.getServerIp().startsWith("http")? "http":harUploadDto.getServerIp().substring(0,harUploadDto.getServerIp().indexOf("://")) ;
-        String domain = harUploadDto.getServerIp().substring(harUploadDto.getServerIp().indexOf("://")+3) ;
+        String protocol = null ;
+        String domain = null ;
+        String port = null ;
+        if ( StringUtils.hasText(harUploadDto.getServerIp()) ) {
+            protocol = harUploadDto.getServerIp().startsWith("https")? "https":harUploadDto.getServerIp().startsWith("http")? "http":harUploadDto.getServerIp().substring(0,harUploadDto.getServerIp().indexOf("://")) ;
+            domain = harUploadDto.getServerIp().substring(harUploadDto.getServerIp().indexOf("://")+3) ;
+            if ( domain.contains(":") ) {
+                port = domain.split(":")[1] ;
+                domain = domain.split(":")[0] ;
+            } else {
+                port = "" ;
+            }
+        }
         config.appendChild(XmlUtil.createTextProp(doc, "HTTPSampler.domain", domain));
+        config.appendChild(XmlUtil.createTextProp(doc, "HTTPSampler.port", port));
         config.appendChild(XmlUtil.createTextProp(doc, "HTTPSampler.protocol", protocol));
         config.appendChild(XmlUtil.createTextProp(doc, "HTTPSampler.implementation", "HttpClient4"));
 

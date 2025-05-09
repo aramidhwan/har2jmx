@@ -48,6 +48,21 @@ logging:
     com.shshin: DEBUG
     org.hibernate: WARN
 
+springdoc:
+  api-docs:
+    enabled: true
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operationsSorter: method
+    tagsSorter: alpha
+    tryItOutEnabled: true
+    filter: true
+  packages-to-scan: com.shshin.har2jmx.controller
+  cache:
+    disabled: true
+
 harParsor:
   queryString:
     type: PARAMETER-TYPE # PATH-PARAMETER-TYPE (url에서 ?이하를 그대로 살림), 그 외 아무글자나.

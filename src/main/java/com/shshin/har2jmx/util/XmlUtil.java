@@ -9,6 +9,9 @@ import org.w3c.dom.Node;
 public class XmlUtil {
 
     public static Element createTextProp(Document doc, String name, String value) {
+        if ( value == null ) {
+            value = "" ;
+        }
         return createTextProp(doc, name, value, value.equals("true") || value.equals("false") ? "boolProp" :
                 value.matches("\\d+") ? "longProp" : "stringProp");
     }
